@@ -1,0 +1,82 @@
+# Docker registry configuration
+dockerRegistry:
+  enabled: true
+  name: docker-registry-secret
+  server: ""
+  username: ""
+  password: ""
+  email: ""
+# App configuration
+app:
+  name: vproapp
+  replicaCount: 1
+  image: registry.gitlab.com/devops5271029/vprofile-java-app
+  tag: 06f779b587d1228fb20e10acff5764c35f365c11
+  imagePullPolicy: Always
+  serviceType: ClusterIP
+  servicePort: 8080
+  serviceTargetPort: 8080
+# Database configuration
+db:
+  name: vprodb
+  replicaCount: 1
+  image: vprocontainers/vprofiledb
+  tag: latest
+  imagePullPolicy: IfNotPresent
+  servicePort: 3306
+  serviceTargetPort: vprodb-port
+  pvcStorageClassName: gp2
+  pvcAccessMode: ReadWriteOnce
+  pvcSize: 3Gi
+# Memcached configuration
+memcached:
+  name: vpromc
+  replicaCount: 1
+  image: memcached
+  tag: latest
+  imagePullPolicy: IfNotPresent
+  serviceName: vprocache01
+  servicePort: 11211
+  serviceTargetPort: vpromc-port
+# RabbitMQ configuration
+rabbitmq:
+  name: vpromq01
+  replicaCount: 1
+  image: rabbitmq
+  tag: latest
+  imagePullPolicy: IfNotPresent
+  servicePort: 5672
+  serviceTargetPort: vpromq01-port
+  user: guest
+# Init containers configuration
+initContainers:
+  app:
+    - name: init-mydb
+      image: busybox:latest
+      args: ['-c', 'until nslookup vprodb.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done;']
+    - name: init-memcache
+      image: busybox:latest
+      args: ['-c', 'until nslookup vprocache01.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mydb; sleep 2; done;']
+  db:
+    - name: busybox
+      image: busybox:latest
+      command: ["sh", "-c", "rm -rf /var/lib/mysql/lost+found"]
+      volumeMounts:
+        - name: vpro-db-data
+          mountPath: /var/lib/mysql
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  host: vprofile.hkhinfoteck.xyz
+  path: /
+  pathType: Prefix
+  serviceName: vproapp-service
+  servicePort: 8080
+# Secrets configuration
+secrets:
+  name: app-secret
+  dbPassword: dnByb2RicGFzcw==
+  rmqPassword: Z3Vlc3Q=
